@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Microsoft.Build.Framework;
@@ -260,6 +261,14 @@ namespace Microsoft.Build.Tasks.Git
         }
 
         public static ITaskItem[] GetSourceRoots(GitRepository repository, string? remoteName, bool warnOnMissingCommitOrUnsupportedUri, Action<string, object?[]> logWarning)
+            => GetSourceRoots(repository, remoteName, warnOnMissingCommitOrUnsupportedUri, logWarning, GetSubmoduleRevisionTimestamp);
+
+        internal static ITaskItem[] GetSourceRoots(
+            GitRepository repository,
+            string? remoteName,
+            bool warnOnMissingCommitOrUnsupportedUri,
+            Action<string, object?[]> logWarning,
+            Func<GitRepository, GitSubmodule, string, string?> getSubmoduleRevisionTimestamp)
         {
             // Not supported for repositories without a working directory.
             NullableDebug.Assert(repository.WorkingDirectory != null);
@@ -273,6 +282,7 @@ namespace Microsoft.Build.Tasks.Git
                 // Don't report a warning since it has already been reported by GetRepositoryUrl task.
                 var repositoryUrl = GetRepositoryUrl(repository, remoteName, logWarning: null);
                 var branchName = repository.GetBranchName();
+                var revisionTimestamp = FormatRevisionTimestamp(repository.GetHeadCommitTimestamp());
 
                 // Item metadata are stored msbuild-escaped. GetMetadata unescapes, SetMetadata stores the value as specified.
                 // Escape msbuild special characters so that URL escapes in the URL are preserved when the URL is read by GetMetadata.
@@ -281,6 +291,7 @@ namespace Microsoft.Build.Tasks.Git
                 item.SetMetadata(Names.SourceRoot.SourceControl, SourceControlName);
                 item.SetMetadata(Names.SourceRoot.ScmRepositoryUrl, Evaluation.ProjectCollection.Escape(repositoryUrl));
                 item.SetMetadata(Names.SourceRoot.RevisionId, revisionId);
+                item.SetMetadata(Names.SourceRoot.RevisionTimestamp, revisionTimestamp);
                 item.SetMetadata(Names.SourceRoot.BranchName, Evaluation.ProjectCollection.Escape(branchName));
                 result.Add(item);
             }
@@ -343,6 +354,7 @@ namespace Microsoft.Build.Tasks.Git
                 item.SetMetadata(Names.SourceRoot.SourceControl, SourceControlName);
                 item.SetMetadata(Names.SourceRoot.ScmRepositoryUrl, Evaluation.ProjectCollection.Escape(submoduleUri.AbsoluteUri));
                 item.SetMetadata(Names.SourceRoot.RevisionId, commitSha);
+                item.SetMetadata(Names.SourceRoot.RevisionTimestamp, getSubmoduleRevisionTimestamp(repository, submodule, commitSha));
                 item.SetMetadata(Names.SourceRoot.ContainingRoot, Evaluation.ProjectCollection.Escape(repoRoot));
                 item.SetMetadata(Names.SourceRoot.NestedRoot, Evaluation.ProjectCollection.Escape(submodule.WorkingDirectoryRelativePath.EndWithSeparator('/')));
                 result.Add(item);
@@ -354,6 +366,27 @@ namespace Microsoft.Build.Tasks.Git
             }
 
             return result.ToArray();
+        }
+
+        internal static string? FormatRevisionTimestamp(DateTimeOffset? value)
+            => value?.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+
+        private static string? GetSubmoduleRevisionTimestamp(GitRepository repository, GitSubmodule submodule, string commitSha)
+        {
+            try
+            {
+                if (!GitRepository.TryGetRepositoryLocation(submodule.WorkingDirectoryFullPath, out var location))
+                {
+                    return null;
+                }
+
+                using var submoduleRepository = GitRepository.OpenRepository(location, repository.Environment);
+                return FormatRevisionTimestamp(submoduleRepository.GetCommitTimestamp(commitSha));
+            }
+            catch (Exception e) when (GitRepository.IsTimestampUnavailableException(e))
+            {
+                return null;
+            }
         }
 
         public static ITaskItem[] GetUntrackedFiles(GitRepository repository, ITaskItem[] files, string projectDirectory)

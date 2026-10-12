@@ -46,8 +46,10 @@ namespace Microsoft.Build.Tasks.Git
         private readonly Lazy<(ImmutableArray<GitSubmodule> Submodules, ImmutableArray<string> Diagnostics)> _lazySubmodules;
         private readonly Lazy<GitIgnore> _lazyIgnore;
         private readonly Lazy<string?> _lazyHeadCommitSha;
+        private readonly Lazy<DateTimeOffset?> _lazyHeadCommitTimestamp;
         private readonly Lazy<string?> _lazyBranchName;
         private readonly GitReferenceResolver _referenceResolver;
+        private readonly GitObjectReader _objectReader;
 
         internal GitRepository(GitEnvironment environment, GitConfig config, string gitDirectory, string commonDirectory, string? workingDirectory)
         {
@@ -62,9 +64,15 @@ namespace Microsoft.Build.Tasks.Git
             Environment = environment;
 
             _referenceResolver = new GitReferenceResolver(gitDirectory, commonDirectory, config.ReferenceStorageFormat, config.ObjectNameFormat);
+            _objectReader = new GitObjectReader(
+                commonDirectory,
+                config.ObjectNameFormat,
+                useCommitGraph: GitConfig.ParseBooleanValue(config.GetVariableValue("core", "commitGraph"), defaultValue: true),
+                useMultiPackIndex: GitConfig.ParseBooleanValue(config.GetVariableValue("core", "multiPackIndex"), defaultValue: true));
             _lazySubmodules = new(ReadSubmodules);
             _lazyIgnore = new(LoadIgnore);
             _lazyHeadCommitSha = new(ReadHeadCommitSha);
+            _lazyHeadCommitTimestamp = new(ReadHeadCommitTimestamp);
             _lazyBranchName = new(ReadBranchName);
         }
 
@@ -79,12 +87,14 @@ namespace Microsoft.Build.Tasks.Git
             ImmutableArray<string> submoduleDiagnostics,
             GitIgnore ignore,
             string? headCommitSha,
-            string? branchName)
+            string? branchName,
+            DateTimeOffset? headCommitTimestamp = null)
             : this(environment, config, gitDirectory, commonDirectory, workingDirectory)
         {
             _lazySubmodules = new(() => (submodules, submoduleDiagnostics));
             _lazyIgnore = new(() => ignore);
             _lazyHeadCommitSha = new(() => headCommitSha);
+            _lazyHeadCommitTimestamp = new(() => headCommitTimestamp);
             _lazyBranchName = new(() => branchName);
         }
 
@@ -160,6 +170,27 @@ namespace Microsoft.Build.Tasks.Git
         /// <exception cref="InvalidDataException"/>
         private string? ReadHeadCommitSha()
             => _referenceResolver.ResolveHeadReference();
+
+        public DateTimeOffset? GetHeadCommitTimestamp()
+            => _lazyHeadCommitTimestamp.Value;
+
+        private DateTimeOffset? ReadHeadCommitTimestamp()
+            => GetHeadCommitSha() is { } commitSha ? GetCommitTimestamp(commitSha) : null;
+
+        public DateTimeOffset? GetCommitTimestamp(string commitSha)
+        {
+            try
+            {
+                return _objectReader.ReadCommitTimestamp(commitSha);
+            }
+            catch (Exception e) when (IsTimestampUnavailableException(e))
+            {
+                return null;
+            }
+        }
+
+        internal static bool IsTimestampUnavailableException(Exception e)
+            => e is IOException or InvalidDataException or NotSupportedException or UnauthorizedAccessException or ArgumentException;
 
         public string? GetBranchName()
             => _lazyBranchName.Value;

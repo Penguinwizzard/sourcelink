@@ -15,6 +15,7 @@ namespace Microsoft.Build.Tasks.Git.UnitTests
         {
             var sourceControl = sourceRoot.GetMetadata("SourceControl");
             var revisionId = sourceRoot.GetMetadata("RevisionId");
+            var revisionTimestamp = sourceRoot.GetMetadata("RevisionTimestamp");
             var nestedRoot = sourceRoot.GetMetadata("NestedRoot");
             var containingRoot = sourceRoot.GetMetadata("ContainingRoot");
             var scmRepositoryUrl = sourceRoot.GetMetadata("ScmRepositoryUrl");
@@ -24,6 +25,7 @@ namespace Microsoft.Build.Tasks.Git.UnitTests
             return $"'{sourceRoot.ItemSpec}'" +
               (string.IsNullOrEmpty(sourceControl) ? "" : $" SourceControl='{sourceControl}'") +
               (string.IsNullOrEmpty(revisionId) ? "" : $" RevisionId='{revisionId}'") +
+              (string.IsNullOrEmpty(revisionTimestamp) ? "" : $" RevisionTimestamp='{revisionTimestamp}'") +
               (string.IsNullOrEmpty(nestedRoot) ? "" : $" NestedRoot='{nestedRoot}'") +
               (string.IsNullOrEmpty(containingRoot) ? "" : $" ContainingRoot='{containingRoot}'") +
               (string.IsNullOrEmpty(scmRepositoryUrl) ? "" : $" ScmRepositoryUrl='{scmRepositoryUrl}'") +

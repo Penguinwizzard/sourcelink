@@ -3,6 +3,7 @@
 // See the License.txt file in the project root for more information.
 
 using TestUtilities;
+using System.Linq;
 using Xunit;
 
 namespace Microsoft.Build.Tasks.Git.UnitTests
@@ -54,6 +55,30 @@ namespace Microsoft.Build.Tasks.Git.UnitTests
             Assert.True(task.Execute(), engine.Log);
             Assert.Null(task.WorkingDirectory);
             Assert.Contains("WARNING", engine.Log);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void RevisionTimestamp_IsExposed(bool packed)
+        {
+            using var temp = new TempRoot();
+            var (repoDir, _, _) = GitObjectTestUtilities.CreateRepositoryWithCommit(
+                temp,
+                "committer Test <test@example.com> 1735734896 -0800\n",
+                packed);
+
+            var engine = new MockEngine();
+            var task = new LocateRepository
+            {
+                BuildEngine = engine,
+                NoWarnOnMissingInfo = true,
+                Path = repoDir.Path,
+            };
+
+            Assert.True(task.Execute(), engine.Log);
+            Assert.Equal("2025-01-01T12:34:56Z", task.RevisionTimestamp);
+            Assert.Equal("2025-01-01T12:34:56Z", task.Roots!.Single().GetMetadata("RevisionTimestamp"));
         }
 
         private static (TempDirectory repoDir, TempDirectory gitDir) CreateMinimalRepository(TempRoot temp)

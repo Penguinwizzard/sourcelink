@@ -143,6 +143,12 @@ The default value is `true`. Set to `false` to suppress publishing `SourceRevisi
 Set by target `InitializeSourceControlInformationFromSourceControlManager` and consumed by NuGet `Pack` target and `GenerateAssemblyInfo` target. 
 May be used by custom targets that need this information.
 
+### SourceRevisionTimestamp
+
+Set by target `InitializeSourceControlInformationFromSourceControlManager` to the Git revision's committer timestamp in UTC RFC 3339 format.
+The property is unset when the commit object is not available in the local repository.
+May be used by custom targets that need a deterministic timestamp associated with `SourceRevisionId`.
+
 ### SourceBranchName
 
 Set by target `InitializeSourceControlInformationFromSourceControlManager` and consumed by NuGet `Pack` target.
@@ -171,6 +177,7 @@ For example, for Git:
 
 - _RepositoryUrl_: e.g. `http://github.com/dotnet/corefx`
 - _BranchName_: e.g. `refs/heads/main` (may be null if branch is in a detached HEAD state)
+- _RevisionTimestamp_: revision committer timestamp in UTC RFC 3339 format, when available
 
 For TFVC:
 

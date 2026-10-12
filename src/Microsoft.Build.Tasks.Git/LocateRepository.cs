@@ -33,6 +33,7 @@ namespace Microsoft.Build.Tasks.Git
         ///   SourceControl: "Git"
         ///   RepositoryUrl: URL of the repository.
         ///   RevisionId: Revision (commit SHA).
+        ///   RevisionTimestamp: Revision committer timestamp in UTC RFC 3339 format.
         ///   ContainingRoot: Identity of the containing source root.
         ///   NestedRoot: For a submodule root, a path of the submodule root relative to the repository root. Ends with a slash.
         /// </summary>
@@ -44,6 +45,12 @@ namespace Microsoft.Build.Tasks.Git
         /// </summary>
         [Output]
         public string? RevisionId { get; private set; }
+
+        /// <summary>
+        /// Head tip committer timestamp in UTC RFC 3339 format.
+        /// </summary>
+        [Output]
+        public string? RevisionTimestamp { get; private set; }
 
         /// <summary>
         /// Branch name.
@@ -63,6 +70,7 @@ namespace Microsoft.Build.Tasks.Git
             Url = GitOperations.GetRepositoryUrl(repository, RemoteName, warnOnMissingOrUnsupportedRemote: !NoWarnOnMissingInfo, Log.LogWarning);
             Roots = GitOperations.GetSourceRoots(repository, RemoteName, warnOnMissingCommitOrUnsupportedUri: !NoWarnOnMissingInfo, Log.LogWarning);
             RevisionId = repository.GetHeadCommitSha();
+            RevisionTimestamp = GitOperations.FormatRevisionTimestamp(repository.GetHeadCommitTimestamp());
             BranchName = repository.GetBranchName();
         }
     }

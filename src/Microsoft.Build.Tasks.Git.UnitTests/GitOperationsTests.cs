@@ -26,6 +26,7 @@ namespace Microsoft.Build.Tasks.Git.UnitTests
             GitConfig? config = null,
             string? commitSha = null,
             string? branchName = null,
+            DateTimeOffset? commitTimestamp = null,
             ImmutableArray<GitSubmodule> submodules = default,
             GitIgnore? ignore = null)
         {
@@ -41,7 +42,8 @@ namespace Microsoft.Build.Tasks.Git.UnitTests
                 submoduleDiagnostics: ImmutableArray<string>.Empty,
                 ignore ?? new GitIgnore(root: null, workingDir, ignoreCase: false),
                 commitSha,
-                branchName);
+                branchName,
+                commitTimestamp);
         }
 
         private GitSubmodule CreateSubmodule(string name, string relativePath, string url, string? headCommitSha, string? containingRepositoryWorkingDir = null)
@@ -334,6 +336,30 @@ namespace Microsoft.Build.Tasks.Git.UnitTests
             }, items.Select(TestUtilities.InspectSourceRoot));
 
             AssertEx.Equal(Array.Empty<string>(), warnings.Select(TestUtilities.InspectDiagnostic));
+        }
+
+        [Fact]
+        public void GetSourceRoots_RevisionTimestamps()
+        {
+            var repo = CreateRepository(
+                commitSha: "0000000000000000000000000000000000000000",
+                commitTimestamp: new DateTimeOffset(2025, 1, 1, 12, 34, 56, TimeSpan.Zero),
+                config: CreateConfig(("submodule.sub.url", "https://github.com/sub")),
+                submodules: ImmutableArray.Create(
+                    CreateSubmodule("sub", "sub", "https://github.com/sub", "1111111111111111111111111111111111111111")));
+
+            var items = GitOperations.GetSourceRoots(
+                repo,
+                remoteName: null,
+                warnOnMissingCommitOrUnsupportedUri: false,
+                logWarning: (_, _) => { },
+                getSubmoduleRevisionTimestamp: (_, _, _) => "2024-12-31T23:59:58Z");
+
+            AssertEx.Equal(new[]
+            {
+                $@"'{_workingDir}{s}' SourceControl='git' RevisionId='0000000000000000000000000000000000000000' RevisionTimestamp='2025-01-01T12:34:56Z'",
+                $@"'{_workingDir}{s}sub{s}' SourceControl='git' RevisionId='1111111111111111111111111111111111111111' RevisionTimestamp='2024-12-31T23:59:58Z' NestedRoot='sub/' ContainingRoot='{_workingDir}{s}' ScmRepositoryUrl='https://github.com/sub'",
+            }, items.Select(TestUtilities.InspectSourceRoot));
         }
 
         [Fact]

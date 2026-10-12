@@ -31,11 +31,14 @@
       <Output TaskParameter="RepositoryId" PropertyName="_GitRepositoryId" />
       <Output TaskParameter="Url" PropertyName="ScmRepositoryUrl" />
       <Output TaskParameter="Roots" ItemName="SourceRoot" />
-      <Output TaskParameter="RevisionId" PropertyName="SourceRevisionId" Condition="'$(SourceRevisionId)' == ''" />
+      <Output TaskParameter="RevisionId" PropertyName="_GitSourceRevisionId" />
+      <Output TaskParameter="RevisionTimestamp" PropertyName="_GitSourceRevisionTimestamp" />
       <Output TaskParameter="BranchName" PropertyName="SourceBranchName" />
     </Microsoft.Build.Tasks.Git.LocateRepository>
 
     <PropertyGroup>
+      <SourceRevisionId Condition="'$(SourceRevisionId)' == ''">$(_GitSourceRevisionId)</SourceRevisionId>
+      <SourceRevisionTimestamp Condition="'$(SourceRevisionTimestamp)' == '' and '$(SourceRevisionId)' == '$(_GitSourceRevisionId)'">$(_GitSourceRevisionTimestamp)</SourceRevisionTimestamp>
       <RepositoryType Condition="'$(RepositoryType)' == ''">git</RepositoryType>
     </PropertyGroup>
   </Target>
